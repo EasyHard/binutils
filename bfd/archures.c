@@ -423,6 +423,7 @@ DESCRIPTION
 .#define bfd_mach_score7         7
 .  bfd_arch_openrisc,  {* OpenRISC *}
 .  bfd_arch_mmix,      {* Donald Knuth's educational processor.  *}
+.  bfd_arch_unicore32,  {* UniCore32 *}
 .  bfd_arch_xstormy16,
 .#define bfd_mach_xstormy16	1
 .  bfd_arch_msp430,    {* Texas Instruments MSP430 architecture.  *}
@@ -578,6 +579,7 @@ extern const bfd_arch_info_type bfd_tic6x_arch;
 extern const bfd_arch_info_type bfd_tic80_arch;
 extern const bfd_arch_info_type bfd_tilegx_arch;
 extern const bfd_arch_info_type bfd_tilepro_arch;
+extern const bfd_arch_info_type bfd_unicore32_arch;
 extern const bfd_arch_info_type bfd_v850_arch;
 extern const bfd_arch_info_type bfd_v850_rh850_arch;
 extern const bfd_arch_info_type bfd_vax_arch;
@@ -662,6 +664,7 @@ static const bfd_arch_info_type * const bfd_archures_list[] =
     &bfd_tic80_arch,
     &bfd_tilegx_arch,
     &bfd_tilepro_arch,
+    &bfd_unicore32_arch,
     &bfd_v850_arch,
     &bfd_v850_rh850_arch,
     &bfd_vax_arch,
