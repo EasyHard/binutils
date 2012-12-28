@@ -12,7 +12,7 @@
 
 
 #define ELF_ARCH                       bfd_arch_unicore32
-#define ELF_MACHINE_CODE               EM_UNICORE32
+#define ELF_MACHINE_CODE               EM_UNICORE
 #define ELF_MAXPAGESIZE                        0x1000
 
 #define TARGET_LITTLE_SYM              bfd_elf32_unicore32_vec
