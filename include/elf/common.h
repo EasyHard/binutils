@@ -406,7 +406,7 @@
 #define EM_ADAPTEVA_EPIPHANY   0x1223  /* Adapteva's Epiphany architecture.  */
 
 /* See the above comment before you add a new EM_* value here.  */
-
+#define EM_UNICORE32 0xed34
 /* Values for e_version.  */
 
 #define EV_NONE		0		/* Invalid ELF version */

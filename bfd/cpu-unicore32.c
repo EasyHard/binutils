@@ -40,5 +40,5 @@ const bfd_arch_info_type bfd_unicore32_arch =
     bfd_default_compatible, 
     bfd_default_scan ,
     NULL,
-    NULL,
+    NULL
   };
