@@ -18,9 +18,7 @@
    along with this program; if not, write to the Free Software Foundation,
    Inc., 51 Franklin Street - Fifth Floor, Boston, MA 02110-1301, USA.  */
 
-#include "sysdep.h"
-#include "dis-asm.h"
-#include "opcode/unicore32.h"
-#include "libiberty.h"
-
-/* Just a stub */
+/*
+  This file is now just a stub. See comment in
+   include/unicore32-opc.h
+*/
