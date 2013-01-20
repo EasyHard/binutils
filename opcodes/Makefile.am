@@ -227,6 +227,8 @@ TARGET_LIBOPCODES_CFILES = \
 	tilegx-opc.c \
 	tilepro-dis.c \
 	tilepro-opc.c \
+	unicore32-dis.c \
+	unicore32-opc.c \
 	v850-dis.c \
 	v850-opc.c \
 	vax-dis.c \
@@ -559,6 +561,9 @@ mips-opc.lo: mips-opc.c
 	$(LTCOMPILE) $(NO_WMISSING_FIELD_INITIALIZERS) -c -o $@ $<
 
 mips16-opc.lo: mips16-opc.c
+	$(LTCOMPILE) $(NO_WMISSING_FIELD_INITIALIZERS) -c -o $@ $<
+
+unicore32-opc.lo: unicore32-opc.c
 	$(LTCOMPILE) $(NO_WMISSING_FIELD_INITIALIZERS) -c -o $@ $<
 
 $(srcdir)/rx-decode.c: @MAINT@ $(srcdir)/rx-decode.opc opc2c$(EXEEXT_FOR_BUILD)
