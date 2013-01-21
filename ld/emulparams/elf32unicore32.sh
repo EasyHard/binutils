@@ -1,0 +1,7 @@
+SCRIPT_NAME=elf32unicore32
+TEMPLATE_NAME=elf32
+OUTPUT_FORMAT="elf32-unicore32"
+ARCH=unicore32
+ENTRY=_start
+EXTRA_EM_FILE=unicore32elf
+EMBEDDED=yes
