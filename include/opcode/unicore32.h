@@ -79,7 +79,7 @@ typedef enum
     InstF(InstField_Cond, 4, 19)                \
     InstF(InstField_R, 1, 26)                   \
     InstF(InstField_A, 1, 25)                   \
-    InstF(InstField_U, 1, 26)                   \
+    InstF(InstField_U, 1, 27)                   \
     InstF(InstField_RdLo, 5,14)                 \
     InstF(InstField_RdHi, 5, 9)                 \
     InstF(InstField_Z, 1, 26)                   \

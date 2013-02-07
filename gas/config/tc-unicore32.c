@@ -99,6 +99,47 @@ static int assemble_inst_arith(inst *ainst,const inst_type* this, char **ops) {
     return 1;
 }
 
+static int assemble_inst_ldst(inst *ainst,
+                              const inst_type* this ATTRIBUTE_UNUSED,
+                              char **ops) {
+    ainst->raw = 0;
+    if (!handle_arguments(ainst, this, ops))
+        return 0;
+    ainst->raw |= this->expect;
+    unsigned long is_post = get_inst_field(ainst, InstField_P);
+    unsigned long w_map[][2] = {
+        {1, 0}, // !is_post
+        {0, 1}  // is_post
+    };
+#define HANDLE_FIELD_W(prefix)                      \
+    if (strstr(ops[0], prefix".w"))                 \
+        set_inst_field(ainst, InstField_W, w_map[is_post][1]);  \
+    else                                            \
+        set_inst_field(ainst, InstField_W, w_map[is_post][0]);  \
+
+    char *found;
+    if ((found = strstr(ops[0], "ldb"))) {
+        set_inst_field(ainst, InstField_B, 1);
+        set_inst_field(ainst, InstField_L, 1);
+        HANDLE_FIELD_W("ldb");
+    } else if ((found = strstr(ops[0], "ldw"))) {
+        set_inst_field(ainst, InstField_B, 0);
+        set_inst_field(ainst, InstField_L, 1);
+        HANDLE_FIELD_W("ldw");
+    } else if ((found = strstr(ops[0], "stb"))) {
+        set_inst_field(ainst, InstField_B, 1);
+        set_inst_field(ainst, InstField_L, 0);
+        HANDLE_FIELD_W("stb");
+    } else if ((found = strstr(ops[0], "stw"))) {
+        set_inst_field(ainst, InstField_B, 0);
+        set_inst_field(ainst, InstField_L, 0);
+        HANDLE_FIELD_W("stw");
+    } else {
+        return 0;
+    }
+    return 1;
+}
+
 static int argfrom_str_r(inst* ainst ATTRIBUTE_UNUSED,
                          argument* arg,
                          int index,
@@ -181,6 +222,46 @@ static int argfrom_str_shiftr(inst* ainst,
     }
 }
 
+static int argfrom_str_uimm(inst* ainst ATTRIBUTE_UNUSED,
+                            argument* arg,
+                            int index,
+                            char** ops) {
+    unsigned long uimm;
+    if (strlen(ops[index+1]) == 0)
+        uimm = 0;
+    else if (sscanf(ops[index+1], "#%lu", &uimm) != 1)
+        return 0;
+    arg->ucontent.uimm = uimm;
+    return 1;
+}
+
+static int argfrom_str_rbase(inst* ainst,
+                              argument* arg,
+                              int index,
+                              char** ops) {
+    unsigned long reg_idx;
+    if (sscanf(ops[index+1], "[r%lu", &reg_idx) != 1)
+        return 0;
+    if (!is_gpreg(reg_idx))
+        return 0;
+    if (endwith(ops[index+1], "+]")) {
+        set_inst_field(ainst, InstField_U, 1);
+        set_inst_field(ainst, InstField_P, 1);
+    } else if (endwith(ops[index+1], "-]")) {
+        set_inst_field(ainst, InstField_U, 0);
+        set_inst_field(ainst, InstField_P, 1);
+    } else if (endwith(ops[index+1], "]+")) {
+        set_inst_field(ainst, InstField_U, 1);
+        set_inst_field(ainst, InstField_P, 0);
+    } else if (endwith(ops[index+1], "]-")) {
+        set_inst_field(ainst, InstField_U, 0);
+        set_inst_field(ainst, InstField_P, 0);
+    } else {
+        return 0;
+    }
+    arg->ucontent.areg = reg_idx;
+    return 1;
+}
 #include "opcode/unicore32-opc.h"
 
 int

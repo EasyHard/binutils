@@ -160,6 +160,36 @@ static void print_arg_shiftr(inst *ainst,
              "%s r%u", shift_map[shift], arg->ucontent.areg);
 }
 
+/***
+ * register as address base
+ * in type: L/S instructions
+ ***/
+static void print_arg_rbase(inst *ainst, argument *arg,
+                            struct disassemble_info *info ATTRIBUTE_UNUSED,
+                            char *output) {
+    regs rbase = arg->ucontent.areg;
+    const char *fmt[] = {"[r%d]%c", "[r%d%c]"};
+    char op[] = {'-', '+'};
+    snprintf(output, PRINT_BUFFER_SIZE,
+             fmt[get_inst_field(ainst, InstField_P)],
+             rbase, op[get_inst_field(ainst, InstField_U)]);
+}
+
+/***
+ * unsigned imm
+ ***/
+static void print_arg_uimm(inst *ainst  ATTRIBUTE_UNUSED,
+                           argument *arg,
+                           struct disassemble_info *info ATTRIBUTE_UNUSED,
+                           char *output) {
+    unsigned long uimm = arg->ucontent.uimm;
+    if (uimm)
+        snprintf(output, PRINT_BUFFER_SIZE,
+                 "#%lu", uimm);
+    else
+        *output = '\0';
+}
+
 #if 0
 /***
  * imm in inst with field `rotate', signed
@@ -174,17 +204,7 @@ static void print_arg_rotateimm(inst *ainst ATTRIBUTE_UNUSED,
     func(stream, "Just a stub");
 }
 
-/***
- * unsigned imm
- ***/
-static void print_arg_uimm(inst *ainst  ATTRIBUTE_UNUSED,
-                           argument *arg,
-                           struct disassemble_info *info) {
-    PTR stream = info->stream;
-    fprintf_ftype func = info->fprintf_func;
-    unsigned long uimm = arg->ucontent.uimm;
-    func(stream, "#%lu", uimm);
-}
+
 
 /***
  * signed imm, for example, imm14 on L/S instructions
@@ -198,19 +218,7 @@ static void print_arg_simm(inst *ainst ATTRIBUTE_UNUSED,
 }
 
 
-/***
- * register as address base
- * in type: L/S instructions
- ***/
-static void print_arg_rbase(inst *ainst, argument *arg, struct disassemble_info *info) {
-    PTR stream = info->stream;
-    fprintf_ftype func = info->fprintf_func;
-    regs rbase = arg->ucontent.areg;
-    char *fmt[] = {"[r%d]%c, [r%d%c]"};
-    char op[] = {'-', '+'};
-    func(stream, fmt[get_inst_field(ainst, InstField_P)],
-         rbase, op[get_inst_field(ainst, InstField_U)]);
-}
+
 
 /***
  * Register List, in L/S multipy
@@ -235,13 +243,7 @@ static void print_arg_lsmulti(inst *ainst,
 }
 #endif
 
-#if 0
-static argument_type noarg = {
-    .from_inst = NULL,
-    .print_arg = NULL,
-    .from_str = NULL,
-};
-#endif
+#define NO_ARG { NULL, NULL, 0, 0, NULL, NULL}
 
 static void print_inst_arith(inst *ainst, struct disassemble_info *info) {
     PTR stream = info->stream;
@@ -251,15 +253,41 @@ static void print_inst_arith(inst *ainst, struct disassemble_info *info) {
         func(stream, ".a");
 }
 
+/**
+ * Disassemble ldw/ldb/stw/stb with .u, .w or nothing
+ **/
+static void print_inst_ldst(inst *ainst, struct disassemble_info *info) {
+    PTR stream = info->stream;
+    fprintf_ftype func = info->fprintf_func;
+    unsigned long is_load = get_inst_field(ainst, InstField_L);
+    unsigned long is_write = get_inst_field(ainst, InstField_W);
+    unsigned long is_post = get_inst_field(ainst, InstField_P);
+    unsigned long is_byte = get_inst_field(ainst, InstField_B);
+    if (is_post) {
+        func(stream, "%s%c%s",
+             is_load ? "ld":"st",
+             is_byte ? 'b':'w',
+             is_write ? ".w":"");
+    } else {
+        func(stream, "%s%c%s",
+             is_load ? "ld":"st",
+             is_byte ? 'b':'w',
+             is_write ? ".u":".w");
+    }
+}
+
 /* Remember to add a similar #define here if you
  * add a new argfrom_str_xxx in tc-unicore32.c
  * and use it in inst_types[].
  * Check the head of this file to see why */
 #ifndef TC_UNICORE32_H
 #define assemble_inst_arith NULL
+#define assemble_inst_ldst NULL
 #define argfrom_str_r NULL
 #define argfrom_str_shiftuimm NULL
 #define argfrom_str_shiftr NULL
+#define argfrom_str_uimm NULL
+#define argfrom_str_rbase NULL
 #endif
 
 /* Macro for binary literal support */
@@ -352,6 +380,17 @@ static const inst_type inst_types[] = {
     ARITH_INS("mov", 11101),
     ARITH_INS("andn", 11110),
     ARITH_INS("not", 11111),
+    {"", "ldst-imm14",
+     B32(11100000, 00000000, 00000000, 00000000),
+     B32(01100000, 00000000, 00000000, 00000000),
+     print_inst_ldst,
+     assemble_inst_ldst,
+     {ARG_SingleUField(InstField_Rd, print_arg_r, argfrom_str_r),
+      ARG_SingleUField(InstField_Rn, print_arg_rbase, argfrom_str_rbase),
+      ARG_SingleUField(InstField_Imm14, print_arg_uimm, argfrom_str_uimm),
+      NO_ARG
+     }
+    },
 };
 static const long NUMINST = ARRAY_SIZE(inst_types);
 
