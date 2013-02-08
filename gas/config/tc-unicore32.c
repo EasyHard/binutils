@@ -24,6 +24,7 @@
 #include "safe-ctype.h"
 #include "dwarf2dbg.h"
 #include "opcode/unicore32.h"
+#include "elf/unicore32.h"
 
 /* Word is considered here as a 16-bit unsigned short int.  */
 #define WORD_SHIFT  32
@@ -37,7 +38,7 @@
 /* Maximum bits which may be set in a `mask16' operand.  */
 #define MAX_REGS_IN_MASK16  16
 
-const char comment_chars[]        = ";";
+const char comment_chars[]        = "@";
 const char line_comment_chars[]   = ";";
 const char line_separator_chars[] = ";";
 /* Don't know what they are yet */
@@ -51,8 +52,28 @@ struct option md_longopts[] =
 size_t md_longopts_size = sizeof (md_longopts);
 const pseudo_typeS md_pseudo_table[] =
 {
-  {0, 0, 0}
+  {"word", cons,  4 },
+  {0, 0, 0},
 };
+static int ATTRIBUTE_PRINTF_1
+debug (const char *string, ...)
+{
+  if (flag_debug)
+    {
+      char str[256];
+
+      VA_OPEN (argptr, string);
+      VA_FIXEDARG (argptr, const char *, string);
+      vsnprintf (str, 256, string, argptr);
+      VA_CLOSE (argptr);
+      if (str[0] == '\0')
+	return (0);
+      fputs (str, stderr);
+      return strlen (str);
+    }
+  else
+    return 0;
+}
 
 static unsigned long get_inst_field(inst const *ainst, inst_fields field);
 static void set_inst_field(inst *ainst, inst_fields field, unsigned long value);
@@ -79,9 +100,9 @@ static int handle_arguments(inst* ainst,
         if (!this->args[i].from_str(ainst,
                                     ainst->args+i,
                                     i,
-                                    ops))
+                                    ops)) {
             return 0;
-        else {
+        } else {
             ainst->args[i].type = this->args+i;
             this->args[i].set_field(ainst, ainst->args+i);
         }
@@ -89,11 +110,18 @@ static int handle_arguments(inst* ainst,
     return 1;
 }
 
-static int assemble_inst_arith(inst *ainst,const inst_type* this, char **ops) {
+static int assemble_inst_default(inst *ainst, const inst_type* this, char** ops)
+{
     ainst->raw = 0;
     if (!handle_arguments(ainst, this, ops))
         return 0;
     ainst->raw |= this->expect;
+    return 1;
+}
+
+static int assemble_inst_arith(inst *ainst,const inst_type* this, char **ops) {
+    if (!assemble_inst_default(ainst, this, ops))
+        return 0;
     if (endwith(ops[0], ".a"))
         ainst->raw |= inst_mask[InstField_S];
     return 1;
@@ -102,10 +130,8 @@ static int assemble_inst_arith(inst *ainst,const inst_type* this, char **ops) {
 static int assemble_inst_ldst(inst *ainst,
                               const inst_type* this ATTRIBUTE_UNUSED,
                               char **ops) {
-    ainst->raw = 0;
-    if (!handle_arguments(ainst, this, ops))
+    if (!assemble_inst_default(ainst, this, ops))
         return 0;
-    ainst->raw |= this->expect;
     unsigned long is_post = get_inst_field(ainst, InstField_P);
     unsigned long w_map[][2] = {
         {1, 0}, // !is_post
@@ -151,7 +177,8 @@ static int argfrom_str_r(inst* ainst ATTRIBUTE_UNUSED,
         arg->ucontent.areg = first_gpreg + reg_idx;
         if (is_gpreg(arg->ucontent.areg))
             return 1;
-        else return 0;
+        else
+            return 0;
     }
 }
 
@@ -262,6 +289,28 @@ static int argfrom_str_rbase(inst* ainst,
     arg->ucontent.areg = reg_idx;
     return 1;
 }
+
+static int argfrom_str_ldst_symbol(inst* ainst,
+                              argument* arg,
+                              int index,
+                             char** ops) {
+    // always using pc as base register
+    set_inst_field(ainst, InstField_Rn, r31);
+
+    char *saved_input_line_pointer = input_line_pointer;
+    input_line_pointer = ops[index+1];
+    expression (&ainst->exp);
+    input_line_pointer = saved_input_line_pointer;
+    debug("In argfrom_str_ldst_symbol, ainst->exp.X_op = %d\n",
+           ainst->exp.X_op);
+    if (ainst->exp.X_op != O_symbol)
+        return 0;
+    // set offset to zero, fixup will fix it for us.
+    arg->ucontent.uimm = 0;
+    ainst->rtype = BFD_RELOC_UNICORE32_IMM14;
+    return 1;
+}
+
 #include "opcode/unicore32-opc.h"
 
 int
@@ -325,12 +374,20 @@ md_assemble (char * str)
     outplace_split_params(ops, str);
     inst ainst;
     for (i = 0; i < NUMINST; i++) {
+        ainst.rtype = BFD_RELOC_NONE;
         if (start_with(ops[0], inst_types[i].prefix) &&
             inst_types[i].assemble(&ainst, inst_types+i, ops))
         {
-            dwarf2_emit_insn (0);
             char *this_frag = frag_more(4);
             md_number_to_chars (this_frag, (valueT) ainst.raw, 4);
+            int pc_relative = bfd_reloc_type_lookup
+                (stdoutput, ainst.rtype)->pc_relative;
+            if (ainst.rtype != BFD_RELOC_NONE) {
+                fix_new_exp (frag_now, this_frag - frag_now->fr_literal,
+                             4, &ainst.exp, pc_relative, ainst.rtype);
+            }
+            dwarf2_emit_insn (0);
+            debug("pick inst type %s\n", inst_types[i].name);
             return ;
         }
     }
@@ -381,18 +438,83 @@ arelent *
 tc_gen_reloc (asection *section ATTRIBUTE_UNUSED,
               fixS * fixP ATTRIBUTE_UNUSED)
 {
-    return NULL;
+    debug("entering tc_gen_reloc with symbol:%s\n",
+          S_GET_NAME(fixP->fx_addsy));
+    reloc_howto_type *reloc_howto;
+    reloc_howto = bfd_reloc_type_lookup(stdoutput, fixP->fx_r_type);
+    debug("reloc type:%s\n", reloc_howto->name);
+    arelent * reloc;
+    reloc = xmalloc (sizeof (arelent));
+    reloc->sym_ptr_ptr  = xmalloc (sizeof (asymbol *));
+    *reloc->sym_ptr_ptr = symbol_get_bfdsym (fixP->fx_addsy);
+    reloc->address = fixP->fx_frag->fr_address + fixP->fx_where;
+    reloc->addend = fixP->fx_offset;
+    if (fixP->fx_subsy != NULL)
+        reloc->addend += S_GET_VALUE (fixP->fx_addsy) -
+            S_GET_VALUE (fixP->fx_subsy);
+
+    gas_assert ((int) fixP->fx_r_type > 0);
+    reloc->howto = bfd_reloc_type_lookup (stdoutput, fixP->fx_r_type);
+
+    if (reloc->howto == NULL)
+    {
+        as_bad_where (fixP->fx_file, fixP->fx_line,
+            _("internal error: reloc %d (`%s')"
+                " not supported by object file format"),
+            fixP->fx_r_type,
+            bfd_get_reloc_code_name (fixP->fx_r_type));
+        return NULL;
+    }
+    gas_assert (!fixP->fx_pcrel == !reloc->howto->pc_relative);
+
+    return reloc;
 }
 
 long
 md_pcrel_from (fixS *fixp)
 {
-  return fixp->fx_frag->fr_address + fixp->fx_where;
+  return fixp->fx_frag->fr_address + fixp->fx_where+4;
+}
+
+
+static void
+apply_fix_by_rtype (fixS *fixP,
+              valueT *valP,
+                    segT seg ATTRIBUTE_UNUSED) {
+        reloc_howto_type *reloc_howto;
+        reloc_howto = bfd_reloc_type_lookup(stdoutput, fixP->fx_r_type);
+        char *buf = fixP->fx_frag->fr_literal + fixP->fx_where;
+        valueT value = 0;
+        int i;
+        for (i = 0; i < 4; i++) {
+            value <<= 8;
+            value += (unsigned char)buf[3-i];
+        }
+        value &= ~reloc_howto->dst_mask;
+        value |= (*valP & reloc_howto->dst_mask) << reloc_howto->bitpos;
+        md_number_to_chars(buf, (valueT)value, 4);
+        fixP->fx_done = 1;
+        fixP->fx_offset = 0;
 }
 
 void
-md_apply_fix (fixS *fixP ATTRIBUTE_UNUSED,
+md_apply_fix (fixS *fixP,
               valueT *valP ATTRIBUTE_UNUSED,
               segT seg ATTRIBUTE_UNUSED)
 {
+    if (fixP->fx_r_type == BFD_RELOC_UNICORE32_IMM14) {
+        if (fixP->fx_pcrel || fixP->fx_addsy != NULL) {
+            as_bad("R_UNICORE32_IMM14 PCREL doesn't adjusted\n");
+            fixP->fx_done = 0;
+        }
+        apply_fix_by_rtype(fixP, valP, seg);
+        return;
+    } else if (fixP->fx_r_type == BFD_RELOC_32){
+        fixP->fx_r_type = BFD_RELOC_UNICORE32_ABS32;
+        if (fixP->fx_addsy || fixP->fx_subsy)
+            fixP->fx_done = 0;
+        else
+            apply_fix_by_rtype(fixP, valP, seg);
+    }
+
 }

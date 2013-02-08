@@ -281,6 +281,7 @@ static void print_inst_ldst(inst *ainst, struct disassemble_info *info) {
  * and use it in inst_types[].
  * Check the head of this file to see why */
 #ifndef TC_UNICORE32_H
+#define assemble_inst_default NULL
 #define assemble_inst_arith NULL
 #define assemble_inst_ldst NULL
 #define argfrom_str_r NULL
@@ -288,6 +289,7 @@ static void print_inst_ldst(inst *ainst, struct disassemble_info *info) {
 #define argfrom_str_shiftr NULL
 #define argfrom_str_uimm NULL
 #define argfrom_str_rbase NULL
+#define argfrom_str_ldst_symbol NULL
 #endif
 
 /* Macro for binary literal support */
@@ -380,6 +382,7 @@ static const inst_type inst_types[] = {
     ARITH_INS("mov", 11101),
     ARITH_INS("andn", 11110),
     ARITH_INS("not", 11111),
+
     {"", "ldst-imm14",
      B32(11100000, 00000000, 00000000, 00000000),
      B32(01100000, 00000000, 00000000, 00000000),
@@ -390,6 +393,17 @@ static const inst_type inst_types[] = {
       ARG_SingleUField(InstField_Imm14, print_arg_uimm, argfrom_str_uimm),
       NO_ARG
      }
+    },
+
+    {"ldw", "ldst-pc-imm14-symbol",
+     B32(11111111, 00000000, 00000000, 00000000),
+     B32(01111001, 00000000, 00000000, 00000000),
+     NULL, // never use this for disassemble ldst-imm14 will do
+     assemble_inst_default,
+     {ARG_SingleUField(InstField_Rd, NULL, argfrom_str_r),
+      ARG_SingleUField(InstField_Imm14, NULL, argfrom_str_ldst_symbol),
+      NO_ARG,
+      NO_ARG}
     },
 };
 static const long NUMINST = ARRAY_SIZE(inst_types);

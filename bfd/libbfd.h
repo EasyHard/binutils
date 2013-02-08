@@ -2673,6 +2673,8 @@ static const char *const bfd_reloc_code_real_names[] = { "@@uninitialized@@",
   "BFD_RELOC_EPIPHANY_SIMM11",
   "BFD_RELOC_EPIPHANY_IMM11",
   "BFD_RELOC_EPIPHANY_IMM8",
+  "BFD_RELOC_UNICORE32_ABS32",
+  "BFD_RELOC_UNICORE32_IMM14",
  "@@overflow: BFD_RELOC_UNUSED@@",
 };
 #endif

@@ -220,6 +220,11 @@ struct _inst{
     unsigned long raw; /* Binary representation of instruction */
     const inst_type  *type;
     argument args[MAX_ARG];
+#ifdef TC_UNICORE32_H
+    /* Expression used for setting the fixups (if any).  */
+    expressionS exp;
+    bfd_reloc_code_real_type rtype;
+#endif /* TC_UNICORE32_H */
 };
 
 #define PRINT_BUFFER_SIZE 256

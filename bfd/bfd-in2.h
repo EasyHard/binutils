@@ -5506,6 +5506,10 @@ giving a 16 bit signed byte offset.  */
 
 /* Adapteva EPIPHANY - 8 bit immediate for 16 bit mov instruction.  */
   BFD_RELOC_EPIPHANY_IMM8,
+
+/* UniCore32 Relocations.  */
+  BFD_RELOC_UNICORE32_ABS32,
+  BFD_RELOC_UNICORE32_IMM14,
   BFD_RELOC_UNUSED };
 typedef enum bfd_reloc_code_real bfd_reloc_code_real_type;
 reloc_howto_type *bfd_reloc_type_lookup
