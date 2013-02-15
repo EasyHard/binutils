@@ -78,6 +78,7 @@ debug (const char *string, ...)
 static unsigned long get_inst_field(inst const *ainst, inst_fields field);
 static void set_inst_field(inst *ainst, inst_fields field, unsigned long value);
 static long u2s(unsigned long us, short width);
+static regs get_register(const char* str);
 
 static int endwith(const char* str, const char* end) {
     const char *strtail = str + strlen(str);
@@ -170,11 +171,11 @@ static int argfrom_str_r(inst* ainst ATTRIBUTE_UNUSED,
                          argument* arg,
                          int index,
                          char** ops) {
-    unsigned int reg_idx;
-    if (sscanf(ops[index+1], "r%u", &reg_idx) != 1) {
+    regs reg;
+    if ((reg = get_register(ops[index+1])) == nullregister) {
         return 0;
     } else {
-        arg->ucontent.areg = first_gpreg + reg_idx;
+        arg->ucontent.areg = reg;
         if (is_gpreg(arg->ucontent.areg))
             return 1;
         else
@@ -238,11 +239,11 @@ static int argfrom_str_shiftr(inst* ainst,
         }
     if (found == NULL)
         return 0;
-    unsigned int reg_idx;
-    if (sscanf(found+2, "r%u", &reg_idx) != 1) {
+    regs reg;
+    if ((reg = get_register(found+2)) == nullregister) {
         return 0;
     } else {
-        arg->ucontent.areg = first_gpreg + reg_idx;
+        arg->ucontent.areg = reg;
         if (is_gpreg(arg->ucontent.areg))
             return 1;
         else return 0;
@@ -266,10 +267,12 @@ static int argfrom_str_rbase(inst* ainst,
                               argument* arg,
                               int index,
                               char** ops) {
-    unsigned long reg_idx;
-    if (sscanf(ops[index+1], "[r%lu", &reg_idx) != 1)
+    regs reg;
+    if (ops[index+1][0] != '[')
         return 0;
-    if (!is_gpreg(reg_idx))
+    if ((reg = get_register(ops[index+1]+1)) == nullregister)
+        return 0;
+    if (!is_gpreg(reg))
         return 0;
     if (endwith(ops[index+1], "+]")) {
         set_inst_field(ainst, InstField_U, 1);
@@ -286,7 +289,7 @@ static int argfrom_str_rbase(inst* ainst,
     } else {
         return 0;
     }
-    arg->ucontent.areg = reg_idx;
+    arg->ucontent.areg = reg;
     return 1;
 }
 

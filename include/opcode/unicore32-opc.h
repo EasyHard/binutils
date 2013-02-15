@@ -92,6 +92,48 @@ static void set_field_singleufield(inst* ainst, argument* arg) {
     set_inst_field(ainst, arg->type->field1, content);
 }
 
+/**
+ * get register from string. Only support general purpose
+ * register now.
+ */
+static const char* gpreg_map[] =
+    {"sl", "fp", "ip", "sp", "lr", "pc"};
+#ifdef TC_UNICORE32_H
+static regs get_register(const char* str) {
+    unsigned long reg_idx;
+    while (*str != '\0' && *str == ' ') str++;
+    if (*str == '\0') return nullregister;
+    if (sscanf(str, "r%lu", &reg_idx)) {
+        /* Need more work for support other type of register */
+        return reg_idx;
+    } else {
+        while (str != NULL && *str == ' ' && *str != '\0')
+            str++;
+        unsigned int i;
+        for (i = 0; i < ARRAY_SIZE(gpreg_map); i++)
+          if (strlen(str) >= 2 &&
+              str[0] == gpreg_map[i][0] && str[1] == gpreg_map[i][1])
+            return i+26;
+    }
+    return nullregister;
+
+}
+#endif
+/**
+ * Get register name. Only support general purpose register now.
+ */
+static const char* get_register_name(regs areg) {
+    static char result[8];
+    if (!is_gpreg(areg))
+        return NULL;
+    if (areg <= r25) {
+        snprintf(result, 8, "r%u", areg);
+        return result;
+    } else {
+        return gpreg_map[areg-r26];
+    }
+}
+
 #if 0
 static void init_combinefield(inst *ainst, argument* arg) {
     unsigned long field_content = get_inst_field(ainst, arg->type->field1);
@@ -114,10 +156,8 @@ static void print_arg_r(inst *ainst ATTRIBUTE_UNUSED,
                         struct disassemble_info *info ATTRIBUTE_UNUSED,
                         char *output) {
     snprintf(output, PRINT_BUFFER_SIZE,
-             "r%d", (int)arg->ucontent.areg);
+        "%s", get_register_name(arg->ucontent.areg));
 }
-
-
 
 /***
  * print argument as shift imm5.
@@ -157,7 +197,8 @@ static void print_arg_shiftr(inst *ainst,
     char const * shift_map[] = {"<<", ">>", "|>", "<>"};
     unsigned long shift = get_inst_field(ainst, InstField_Shift);
     snprintf(output, PRINT_BUFFER_SIZE,
-             "%s r%u", shift_map[shift], arg->ucontent.areg);
+             "%s %s", shift_map[shift],
+             get_register_name(arg->ucontent.areg));
 }
 
 /***
@@ -168,11 +209,12 @@ static void print_arg_rbase(inst *ainst, argument *arg,
                             struct disassemble_info *info ATTRIBUTE_UNUSED,
                             char *output) {
     regs rbase = arg->ucontent.areg;
-    const char *fmt[] = {"[r%d]%c", "[r%d%c]"};
+    const char *fmt[] = {"[%s]%c", "[%s%c]"};
     char op[] = {'-', '+'};
     snprintf(output, PRINT_BUFFER_SIZE,
              fmt[get_inst_field(ainst, InstField_P)],
-             rbase, op[get_inst_field(ainst, InstField_U)]);
+             get_register_name(rbase),
+             op[get_inst_field(ainst, InstField_U)]);
 }
 
 /***
@@ -237,7 +279,8 @@ static void print_arg_lsmulti(inst *ainst,
                 first_reg = 0;
             else
                 func(stream, " ");
-            func(stream, "r%d", base+i);
+            func(stream, "%s",
+                 get_register_name(base+i));
         }
     }
 }
