@@ -128,39 +128,43 @@ static int assemble_inst_arith(inst *ainst,const inst_type* this, char **ops) {
     return 1;
 }
 
+static const unsigned long ldst_w_map[][2] = {
+        {1, 0}, // !is_post
+        {0, 1}  // is_post
+    };
+#define LDST_HANDLE_FIELD_W(ainst, is_post, prefix)                     \
+  do {                                                                  \
+    if (strstr(ops[0], prefix".w"))                                     \
+      set_inst_field(ainst, InstField_W, ldst_w_map[is_post][1]);       \
+    else                                                                \
+      set_inst_field(ainst, InstField_W, ldst_w_map[is_post][0]);       \
+  } while(0)                                                            \
+
+
 static int assemble_inst_ldst(inst *ainst,
                               const inst_type* this ATTRIBUTE_UNUSED,
                               char **ops) {
     if (!assemble_inst_default(ainst, this, ops))
         return 0;
     unsigned long is_post = get_inst_field(ainst, InstField_P);
-    unsigned long w_map[][2] = {
-        {1, 0}, // !is_post
-        {0, 1}  // is_post
-    };
-#define HANDLE_FIELD_W(prefix)                      \
-    if (strstr(ops[0], prefix".w"))                 \
-        set_inst_field(ainst, InstField_W, w_map[is_post][1]);  \
-    else                                            \
-        set_inst_field(ainst, InstField_W, w_map[is_post][0]);  \
 
     char *found;
     if ((found = strstr(ops[0], "ldb"))) {
         set_inst_field(ainst, InstField_B, 1);
         set_inst_field(ainst, InstField_L, 1);
-        HANDLE_FIELD_W("ldb");
+        LDST_HANDLE_FIELD_W(ainst, is_post, "ldb");
     } else if ((found = strstr(ops[0], "ldw"))) {
         set_inst_field(ainst, InstField_B, 0);
         set_inst_field(ainst, InstField_L, 1);
-        HANDLE_FIELD_W("ldw");
+        LDST_HANDLE_FIELD_W(ainst, is_post, "ldw");
     } else if ((found = strstr(ops[0], "stb"))) {
         set_inst_field(ainst, InstField_B, 1);
         set_inst_field(ainst, InstField_L, 0);
-        HANDLE_FIELD_W("stb");
+        LDST_HANDLE_FIELD_W(ainst, is_post, "stb");
     } else if ((found = strstr(ops[0], "stw"))) {
         set_inst_field(ainst, InstField_B, 0);
         set_inst_field(ainst, InstField_L, 0);
-        HANDLE_FIELD_W("stw");
+        LDST_HANDLE_FIELD_W(ainst, is_post, "stw");
     } else {
         return 0;
     }

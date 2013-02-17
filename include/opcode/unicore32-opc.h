@@ -297,26 +297,35 @@ static void print_inst_arith(inst *ainst, struct disassemble_info *info) {
 }
 
 /**
+ * Disassemble ld/st instruction's suffix
+ **/
+static void print_inst_ldst_suffix(inst *ainst, struct disassemble_info *info)
+{
+    PTR stream = info->stream;
+    fprintf_ftype func = info->fprintf_func;
+    unsigned long is_write = get_inst_field(ainst, InstField_W);
+    unsigned long is_post = get_inst_field(ainst, InstField_P);
+    if (is_post) {
+        func(stream, "%s",
+             is_write ? ".w":"");
+    } else {
+        func(stream, "%s",
+             is_write ? ".u":".w");
+    }
+}
+
+/**
  * Disassemble ldw/ldb/stw/stb with .u, .w or nothing
  **/
 static void print_inst_ldst(inst *ainst, struct disassemble_info *info) {
     PTR stream = info->stream;
     fprintf_ftype func = info->fprintf_func;
     unsigned long is_load = get_inst_field(ainst, InstField_L);
-    unsigned long is_write = get_inst_field(ainst, InstField_W);
-    unsigned long is_post = get_inst_field(ainst, InstField_P);
     unsigned long is_byte = get_inst_field(ainst, InstField_B);
-    if (is_post) {
-        func(stream, "%s%c%s",
-             is_load ? "ld":"st",
-             is_byte ? 'b':'w',
-             is_write ? ".w":"");
-    } else {
-        func(stream, "%s%c%s",
-             is_load ? "ld":"st",
-             is_byte ? 'b':'w',
-             is_write ? ".u":".w");
-    }
+    func(stream, "%s%c",
+         is_load ? "ld":"st",
+         is_byte ? 'b':'w');
+    print_inst_ldst_suffix(ainst, info);
 }
 
 /* Remember to add a similar #define here if you
