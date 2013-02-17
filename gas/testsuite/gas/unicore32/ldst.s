@@ -1,0 +1,34 @@
+.global _start
+_start:
+    ldb r0, [r1+], #0
+    ldw r0, [r1+], #0
+    ldb r0, [r1-], #0
+    ldw r0, [r1-], #0
+    ldb.u r0, [r1]+, #0
+    ldw.u r0, [r1]+, #0
+    ldb.u r0, [r1]-, #0
+    ldw.u r0, [r1]-, #0
+    ldb.w r0, [r1+], #0
+    ldw.w r0, [r1+], #0
+    ldb.w r0, [r1-], #0
+    ldw.w r0, [r1-], #0
+    ldb.w r0, [r1]+, #0
+    ldw.w r0, [r1]+, #0
+    ldb.w r0, [r1]-, #0
+    ldw.w r0, [r1]-, #0
+    stb r0, [r1+], #0
+    stw r0, [r1+], #0
+    stb r0, [r1-], #0
+    stw r0, [r1-], #0
+    stb.u r0, [r1]+, #0
+    stw.u r0, [r1]+, #0
+    stb.u r0, [r1]-, #0
+    stw.u r0, [r1]-, #0
+    stb.w r0, [r1+], #0
+    stw.w r0, [r1+], #0
+    stb.w r0, [r1-], #0
+    stw.w r0, [r1-], #0
+    stb.w r0, [r1]+, #0
+    stw.w r0, [r1]+, #0
+    stb.w r0, [r1]-, #0
+    stw.w r0, [r1]-, #0
