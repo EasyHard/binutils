@@ -268,9 +268,9 @@ static int argfrom_str_uimm(inst* ainst ATTRIBUTE_UNUSED,
 }
 
 static int argfrom_str_rbase(inst* ainst,
-                              argument* arg,
-                              int index,
-                              char** ops) {
+                             argument* arg,
+                             int index,
+                             char** ops) {
     regs reg;
     if (ops[index+1][0] != '[')
         return 0;
@@ -298,9 +298,9 @@ static int argfrom_str_rbase(inst* ainst,
 }
 
 static int argfrom_str_ldst_symbol(inst* ainst,
-                              argument* arg,
-                              int index,
-                             char** ops) {
+                                   argument* arg,
+                                   int index,
+                                   char** ops) {
     // always using pc as base register
     set_inst_field(ainst, InstField_Rn, r31);
 
