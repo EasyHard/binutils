@@ -92,6 +92,24 @@ static void set_field_singleufield(inst* ainst, argument* arg) {
     set_inst_field(ainst, arg->type->field1, content);
 }
 
+static void init_combinefield(inst *ainst, argument* arg) {
+    unsigned long field_content = get_inst_field(ainst, arg->type->field1);
+    field_content <<= inst_width[arg->type->field2];
+    field_content |= get_inst_field(ainst, arg->type->field2);
+    arg->ucontent.raw = field_content;
+    arg->scontent = u2s(arg->ucontent.raw,
+                       inst_width[arg->type->field1]+
+                       inst_width[arg->type->field2]);
+    return ;
+}
+
+static void set_field_combineufield(inst* ainst, argument* arg) {
+    unsigned long content = arg->ucontent.raw;
+    set_inst_field(ainst, arg->type->field2, content);
+    set_inst_field(ainst, arg->type->field1,
+                   content >> inst_width[arg->type->field2]);
+}
+
 /**
  * get register from string. Only support general purpose
  * register now.
@@ -133,19 +151,6 @@ static const char* get_register_name(regs areg) {
         return gpreg_map[areg-r26];
     }
 }
-
-#if 0
-static void init_combinefield(inst *ainst, argument* arg) {
-    unsigned long field_content = get_inst_field(ainst, arg->type->field1);
-    field_content <<= inst_width[arg->type->field2];
-    field_content |= get_inst_field(ainst, arg->type->field2);
-    arg->ucontent.raw = field_content;
-    arg->scontent = u2s(arg->ucontent.raw,
-                       inst_width[arg->type->field1]+
-                       inst_width[arg->type->field2]);
-    return ;
-}
-#endif
 
 /***
  * print argument as regard register
@@ -258,33 +263,31 @@ static void print_arg_simm(inst *ainst ATTRIBUTE_UNUSED,
     fprintf_ftype func = info->fprintf_func;
     func(stream, "#%ld", arg->scontent);
 }
-
-
-
+#endif
 
 /***
  * Register List, in L/S multipy
  */
-static void print_arg_lsmulti(inst *ainst,
+static void print_arg_rmulti(inst *ainst,
                               argument *arg,
-                              struct disassemble_info *info) {
-    PTR stream = info->stream;
-    fprintf_ftype func = info->fprintf_func;
+                              struct disassemble_info *info ATTRIBUTE_UNUSED,
+                              char* output)
+{
     unsigned long reg_bitmap = arg->ucontent.raw;
     int base = get_inst_field(ainst, InstField_H)? 16 : 0;
+    strcat(output, "(");
     int first_reg = 1, i;
     for (i = 0; i < 16; i++) {
         if (reg_bitmap & (1 << i)) {
             if (first_reg)
                 first_reg = 0;
             else
-                func(stream, " ");
-            func(stream, "%s",
-                 get_register_name(base+i));
+                strcat(output, ", ");
+            strcat(output, get_register_name(base+i));
         }
     }
+    strcat(output, ")");
 }
-#endif
 
 #define NO_ARG { NULL, NULL, 0, 0, NULL, NULL}
 
@@ -328,6 +331,18 @@ static void print_inst_ldst(inst *ainst, struct disassemble_info *info) {
     print_inst_ldst_suffix(ainst, info);
 }
 
+/**
+ * Disassemble stm/ldm with suffix
+ **/
+static void print_inst_ldst_multi(inst *ainst, struct disassemble_info *info)
+{
+    PTR stream = info->stream;
+    fprintf_ftype func = info->fprintf_func;
+    func(stream, "%s", ainst->type->prefix);
+    int is_write = get_inst_field(ainst, InstField_W);
+    func(stream, "%s", is_write? ".w" : "");
+}
+
 /* Remember to add a similar #define here if you
  * add a new argfrom_str_xxx in tc-unicore32.c
  * and use it in inst_types[].
@@ -336,11 +351,13 @@ static void print_inst_ldst(inst *ainst, struct disassemble_info *info) {
 #define assemble_inst_default NULL
 #define assemble_inst_arith NULL
 #define assemble_inst_ldst NULL
+#define assemble_inst_ldst_multi NULL
 #define argfrom_str_r NULL
 #define argfrom_str_shiftuimm NULL
 #define argfrom_str_shiftr NULL
 #define argfrom_str_uimm NULL
 #define argfrom_str_rbase NULL
+#define argfrom_str_rmulti NULL
 #define argfrom_str_ldst_symbol NULL
 #endif
 
@@ -365,10 +382,13 @@ static void print_inst_ldst(inst *ainst, struct disassemble_info *info) {
 
 #define SingleSField(field) init_singlefield, set_field_singlesfield, field, 0
 #define SingleUField(field) init_singlefield, set_field_singleufield, field, 0
+#define CombineUField(field1, field2)                   \
+    init_combinefield, set_field_combineufield, field1, field2
 #define ARG_T(INIT, PRINT) {INIT, PRINT}
 #define ARG_SingleSField(field, PRINT, AS) {SingleSField(field), PRINT, AS}
 #define ARG_SingleUField(field, PRINT, AS) {SingleUField(field), PRINT, AS}
-
+#define ARG_CombineUField(field1, field2, PRINT, AS)    \
+    {CombineUField(field1, field2), PRINT, AS}
 
 
 static const inst_type inst_types[] = {
@@ -456,6 +476,17 @@ static const inst_type inst_types[] = {
       ARG_SingleUField(InstField_Imm14, NULL, argfrom_str_ldst_symbol),
       NO_ARG,
       NO_ARG}
+    },
+
+    {"stm", "stm-st-multi-registers",
+     B32(11100001, 00000000, 00000001, 10000000),
+     B32(10000000, 00000000, 00000000, 00000000),
+     print_inst_ldst_multi,
+     assemble_inst_ldst_multi,
+     {ARG_CombineUField(InstField_hRlist, InstField_lRlist,
+                        print_arg_rmulti, argfrom_str_rmulti),
+      ARG_SingleUField(InstField_Rn, print_arg_rbase, argfrom_str_rbase),
+      NO_ARG, NO_ARG}
     },
 };
 static const long NUMINST = ARRAY_SIZE(inst_types);

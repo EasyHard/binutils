@@ -171,6 +171,19 @@ static int assemble_inst_ldst(inst *ainst,
     return 1;
 }
 
+static int assemble_inst_ldst_multi(inst *ainst,
+                                    const inst_type* this,
+                                    char **ops)
+{
+    if (!assemble_inst_default(ainst, this, ops))
+        return 0;
+    if (strstr(ops[0], ".w") || strstr(ops[0], ".u"))
+        set_inst_field(ainst, InstField_W, 1);
+    else
+        set_inst_field(ainst, InstField_W, 0);
+    return 1;
+}
+
 static int argfrom_str_r(inst* ainst ATTRIBUTE_UNUSED,
                          argument* arg,
                          int index,
@@ -318,6 +331,33 @@ static int argfrom_str_ldst_symbol(inst* ainst,
     return 1;
 }
 
+static int argfrom_str_rmulti(inst* ainst,
+                              argument* arg,
+                              int index,
+                              char** ops) {
+    if (ops[index+1] == NULL || strlen(ops[index+1]) <= 2)
+        return 0;
+    if (ops[index+1][0] != '(')
+        return 0;
+    arg->ucontent.raw = 0;
+    char* reg_name = strtok(ops[index+1]+1, ",)");
+    while (reg_name) {
+        unsigned int reg_idx = get_register(reg_name);
+        printf("get reg name:%s, num: %u\n", reg_name, reg_idx);
+        if (!is_gpreg(reg_idx))
+            return 0;
+        arg->ucontent.raw |= 1 << reg_idx;
+        reg_name = strtok(NULL, ",)");
+    }
+    printf("rmulti: raw = %08lx\n", arg->ucontent.raw);
+    if (arg->ucontent.raw == 0) return 0;
+    int base = arg->ucontent.raw & 0x0000ffff ? 0 : 1;
+    set_inst_field(ainst, InstField_H, base);
+    if (base == 1)
+        arg->ucontent.raw = arg->ucontent.raw >> 16;
+    return 1;
+}
+
 #include "opcode/unicore32-opc.h"
 
 int
@@ -340,7 +380,20 @@ static int outplace_split_params(char *result[], char *str) {
     int count = 0;
     char* curr = strtok(str, " ");
     while (curr) {
-        strcpy(result[count], curr);
+        if (curr[0] == '(') /* Begin of multipy registers list */
+        {
+            /* accumulate until we catch ')' */
+            while (curr[strlen(curr)-1] != ')') {
+                strcat(result[count], curr);
+                strcat(result[count], ", ");
+                curr = strtok(NULL, ",");
+                if (curr == NULL) /* This shouldn't happend */
+                    return count;
+            }
+            strcat(result[count], curr);
+        } else {
+            strcpy(result[count], curr);
+        }
         count++;
         curr = strtok(NULL, ",");
     }
@@ -356,6 +409,8 @@ static int outplace_split_params(char *result[], char *str) {
         *found = '\0';
         count++;
     }
+    for (i = 0; i < count; i++)
+        printf("result[%d] = %s\n", i, result[i]);
     return count;
 }
 

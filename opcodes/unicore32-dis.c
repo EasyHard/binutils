@@ -88,6 +88,7 @@ print_insn_unicore32 (bfd_vma memaddr, struct disassemble_info *info)
             /* Disassembler */
             ainst.type->print(&ainst, info);
             char args_output[MAX_ARG][PRINT_BUFFER_SIZE];
+            memset(args_output, 0, sizeof(args_output));
             for (j = 0; j < MAX_ARG && ainst.type->args[j].from_inst; j++)
                 ainst.type->args[j].print_arg(&ainst, &ainst.args[j],
                                               info, (char*)(args_output+j));
